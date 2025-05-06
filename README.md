@@ -73,7 +73,7 @@ The script uses command-line arguments to control the inference process. These a
 
 The model weights (e.g., `iter_5673.tar`) are available on Google Drive. You must download and place the **entire folder** (not just the `.tar` file) in your working directory. This is because the inference script loads the training configuration from `config_details.json`, which resides in the same folder hierarchy as the model file.
 Get the files : https://drive.google.com/drive/folders/1rf8AmVWnpYgKbe2zcJx6AkMxsZ8WPEbk?usp=sharing
-The model weights file iter_5673.tar is inside train folder.
+The model weights file iter_5673.tar is inside train folder. You need to download the Run0004 folder. 
 ```python
 config_path = os.path.join(os.path.dirname(
     os.path.dirname(config.model_path)), "config_details.json")
