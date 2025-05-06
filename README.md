@@ -13,7 +13,6 @@ conda activate inference
 
 ### Step 2: Install dependencies
 
-Make sure `requirements.txt` is present in the root directory.
 
 ```bash
 pip install -r requirements.txt
@@ -79,7 +78,6 @@ config_path = os.path.join(os.path.dirname(
     os.path.dirname(config.model_path)), "config_details.json")
 ```
 
-Make sure this file is present alongside your model directory structure.
 
 ---
 
