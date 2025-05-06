@@ -1,0 +1,8 @@
+Set max length to 4096
+num gpus
+2
+Configured device_map.
+model
+output
+vit
+vision_proj

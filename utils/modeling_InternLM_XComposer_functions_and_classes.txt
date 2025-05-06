@@ -1,0 +1,19 @@
+class InternLMXComposerForCausalLM(PreTrainedModel):
+def __init__(self, config):
+def get_input_embeddings(self):
+def _set_gradient_checkpointing(self, module, value):
+def maybe_autocast(self, dtype):
+def init_qformer(cls, num_query_token, vision_width, cross_attention_freq, pretrain):
+def encode_img(self, image):
+def encode_text(self, text, add_special_tokens):
+def decode_text(self, out_embeds):
+def wrap_text(self, user_text, bot_text, add_special):
+def get_gen_args(self):
+def generate(self, text, image):
+def chat(self, text, image, history):
+def wrap_prompt(self, text_embeds, img_embeds, history, add_special):
+def prompt_wrap(self, img_embeds, prompt):
+def align_text(self, samples, has_img):
+def text2emb(self, text):
+def mask_human_targets(self, input_ids, pure):
+def forward(self, input_ids, attention_mask, inputs_embeds, labels, output_attentions, output_hidden_states, return_dict):

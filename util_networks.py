@@ -33,8 +33,6 @@ def get_internLM_model(config):
     tokenizer = AutoTokenizer.from_pretrained(
         checkpoint, trust_remote_code=True)
     model.tokenizer = tokenizer
-    print(model.Qformer)
-    exit()
     return model
 
 # quantised internlm model class

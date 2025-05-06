@@ -17,6 +17,7 @@ import csv
 # File imports
 from util_networks import *
 from util_dataload import *
+from util_get_internlm_logits import get_init_logits_no_llm, get_init_logits_coop, init_prompt
 from llm_feature_extraction import *
 
 
@@ -26,15 +27,17 @@ def convert_models_to_fp32(model):
     return
 
 
-def load_model( model, aggregator, path):
-    checkpoint = torch.load(path, map_location=default_device)
+def load_model(model, aggregator, regressor, path, learnable_prompt_embeddings=None):
+    checkpoint = torch.load(path)
     model.load_state_dict(checkpoint['model']['state_dict'], strict=False)
     aggregator.load_state_dict(checkpoint['aggregator']['state_dict'])
-    if config.model_type != 'no_qformer':
-        regressor.load_state_dict(checkpoint['regressor']['state_dict'])
-        return model, aggregator, regressor
-    else :
-        return model, aggregator
+    regressor.load_state_dict(checkpoint['regressor']['state_dict'])
+    models = {'model': model, 'aggregator': aggregator, 'regressor': regressor}
+    if 'learnable_prompt_embeddings' in checkpoint.keys():
+        learnable_prompt_embeddings.data = checkpoint['learnable_prompt_embeddings'][
+            'state_dict']['learnable_prompt_embeddings']
+        models['learnable_prompt_embeddings'] = learnable_prompt_embeddings
+    return models
 
 # this is a legacy function, not sure if needed
 
@@ -57,7 +60,7 @@ def init_test_dataloaders(config):
     return pooled_test_loader
 
 
-def get_predictions(config, test_loader, model, aggregator, regressor, device, tokenizer=None, image_processor=None):
+def get_predictions(config, test_loader, model, aggregator, regressor, device, tokenizer=None, image_processor=None, learnable_prompt_embeddings=None):
     predicted_scores = []
     corresponding_name = []
     corresponding_mos = []
@@ -69,14 +72,14 @@ def get_predictions(config, test_loader, model, aggregator, regressor, device, t
 
         if config.model_description == 'internlm_vl':
             if config.logit_processing_type == 'init':
-                if config.model_type == 'no_qformer':
-                    hidden_states = get_init_logits_no_qformer(model, img_input)
-                    # hidden_states2 = get_init_logits_no_qformer(self.model, img_input2)
-                else : 
-                    hidden_states = get_init_logits(
-                    model, img_input)
-                # hidden_states = get_init_logits(
-                #     model, img_input)
+                if config.model_type == 'basic':
+                    hidden_states = get_init_logits(model, img_input)
+                elif config.model_type == 'no_llm':
+                    hidden_states = get_init_logits_no_llm(
+                        model, img_input)
+                elif config.model_type == 'coop':
+                    hidden_states = get_init_logits_coop(
+                        model, img_input, learnable_prompt_embeddings)
             elif config.logit_processing_type == 'sentence':
                 hidden_states = get_sentence_logits(
                     model, img_input, gen_config)
@@ -110,10 +113,7 @@ def get_predictions(config, test_loader, model, aggregator, regressor, device, t
                     model, img_input, gen_config)
 
         predicted_video_feats = aggregator(hidden_states)
-        if config.model_type == 'no_qformer':
-            predicted_video_scores = predicted_video_feats
-        else : 
-            predicted_video_scores = regressor(predicted_video_feats)
+        predicted_video_scores = regressor(predicted_video_feats)
 
         predicted_scores.append(predicted_video_scores.detach().cpu())
         corresponding_name.append(name)
@@ -125,8 +125,7 @@ def get_predictions(config, test_loader, model, aggregator, regressor, device, t
     predicted_scores = torch.cat(
         predicted_scores, dim=0).squeeze().numpy().tolist()
     corresponding_mos = torch.cat(corresponding_mos, dim=0).squeeze().tolist()
-    print(len(predicted_scores))
-    print(len(corresponding_mos))
+
 
     try:
         corresponding_name = list(np.concatenate(corresponding_name))
@@ -169,15 +168,20 @@ def test_model(config):
     if config.model_description == 'mplug_owl':
         model, tokenizer, image_processor = get_mplug_owl_model(config)
 
+    if config.model_type == 'coop':
+        learnable_prompt_embeddings = nn.Parameter(
+            init_prompt(model), requires_grad=True)
+    else:
+        learnable_prompt_embeddings = None
+
+    if config.model_type == 'no_llm':
+        model.internlm_model = nn.Identity()
+
     regressor = NormalRegressor1(config.embed_dim)
 
     if config.network_type == "b_attn":
-        if config.model_type == 'no_qformer':
-            aggregator = no_qformer_aggregator(
-                1408, config.num_mha_heads, config.num_layers).to(device)
-        else : 
-            aggregator = BasicMultiheadAttentionAggregator(
-                config.embed_dim, config.num_heads, regressor_bool=False)
+        aggregator = BasicMultiheadAttentionAggregator(
+            config.embed_dim, config.num_heads, regressor_bool=False)
     elif config.network_type == "attn":
         aggregator = AttentionAggregator(
             config.embed_dim, config.num_heads, regressor_bool=False)
@@ -189,12 +193,13 @@ def test_model(config):
     # add model path here
     model_path = config.model_path
     print(model_path)
-    if config.model_type == 'no_qformer':
-        model, aggregator = load_model(
-            config, model, aggregator, model_path)
-    else : 
-        model, aggregator, regressor = load_model(
-            config, model, aggregator, regressor, model_path)
+    models = load_model(model, aggregator, regressor,
+                        model_path, learnable_prompt_embeddings)
+    model = models['model']
+    aggregator = models['aggregator']
+    regressor = models['regressor']
+    if 'learnable_prompt_embeddings' in models.keys():
+        learnable_prompt_embeddings = models['learnable_prompt_embeddings']
     convert_models_to_fp32(model)
     model = weight_mode(model, trainable=False)
     model.eval()
@@ -212,7 +217,7 @@ def test_model(config):
 
     with torch.no_grad():
         test_prediction, corresponding_mos, corresponding_name = get_predictions(
-            config, pooled_test_loader, model, aggregator, regressor, device, tokenizer, image_processor)
+            config, pooled_test_loader, model, aggregator, regressor, device, tokenizer, image_processor, learnable_prompt_embeddings)
 
     srcc_test_correlation = spearmanr(
         np.array(test_prediction), np.array(corresponding_mos))[0]
@@ -228,13 +233,14 @@ def test_model(config):
 def configuration_params():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mode', type=str, default='eval')
-    parser.add_argument('--model_path', type=str, required=True)
+    parser.add_argument('--model_path', type=str, default='/scratch/sanjotst/Nithin/mse_triplet_no_llm_runs/Run0004/Train/iter_5673.tar')
     parser.add_argument('--embed_dim', type=int, default=4096)
     parser.add_argument('--network_type', type=str, default='b_attn')
     parser.add_argument('--num_heads', type=int, default=8)
-    parser.add_argument('--default_device', type=int, default=7)
+    parser.add_argument('--default_device', type=int, default=6)
     parser.add_argument('--num_gpus', type=int, default=1)
     parser.add_argument('--model_description', type=str, default='internlm_vl')
+    parser.add_argument('--model_type', type=str, default='no_llm')
     config = parser.parse_args()
     return config
 
@@ -242,38 +248,43 @@ def configuration_params():
 def get_dataset_info():
     return {
 
-        # 'live_iqa': {
-        #     'json_path': '/home/sanjotst/llm_iqa/llm-iqa/labels/live_iqa.json',
-        #     'img_dir': '/scratch/sanjotst/datasets/LIVE_IQA'
-        # },
-        'live_iqa': {
-            'json_path': '/scratch/sanjotst/datasets/LIVE_IQA_new/live_iqa_new.json',
-            'img_dir': '/scratch/sanjotst/datasets/LIVE_IQA_new'
+        'AGIQA-3k': {
+            'json_path': '/scratch/sanjotst/datasets/AGIQA-3k/agiqa3k.json',
+            'img_dir': '/scratch/sanjotst/datasets/AGIQA-3k/Images'
         },
-        'nnid': {
-            'json_path': '/scratch/sanjotst/datasets/NNID/nnid.json',
-            'img_dir': '/scratch/sanjotst/datasets/NNID'
-        },
-        'livec': {
-            'json_path': '/home/sanjotst/llm_iqa/llm-iqa/labels/livec.json',
-            'img_dir': '/scratch/sanjotst/datasets/CLIVE/ChallengeDB_release/Images'
-        },
-        'kadid': {
-            'json_path': '/home/sanjotst/llm_iqa/llm-iqa/labels/kadid.json',
-            'img_dir': '/scratch/sanjotst/datasets/kadid10k/images'
-        },
-        'koniq': {
-            'json_path': '/home/sanjotst/llm_iqa/llm-iqa/labels/koniq.json',
-            'img_dir': '/scratch/sanjotst/datasets/KonIQ-10k/512x384'
-        },
-        'pipal': {
-            'json_path': '/home/sanjotst/llm_iqa/llm-iqa/labels/pipal.json',
-            'img_dir': '/scratch/sanjotst/datasets/PIPAL'
-        },
-        'spaq': {
-            'json_path': '/home/sanjotst/llm_iqa/llm-iqa/labels/spaq.json',
-            'img_dir': '/scratch/sanjotst/datasets/SPAQ_512/TestImage'
+        'AIGCIQA2023': {
+            'json_path': '/scratch/sanjotst/datasets/AIGCIQA2023/aigciqa.json',
+            'img_dir': '/scratch/sanjotst/datasets/AGIQA-3k/Images'
         }
+        # ,
+        # 'live_iqa': {
+        #     'json_path': '/scratch/sanjotst/datasets/LIVE_IQA_new/live_iqa_new.json',
+        #     'img_dir': '/scratch/sanjotst/datasets/LIVE_IQA_new'
+        # },
+        # 'nnid': {
+        #     'json_path': '/scratch/sanjotst/datasets/NNID/nnid.json',
+        #     'img_dir': '/scratch/sanjotst/datasets/NNID'
+        # },
+        # 'livec': {
+        #     'json_path': '/home/sanjotst/llm_iqa/llm-iqa/labels/livec.json',
+        #     'img_dir': '/scratch/sanjotst/datasets/CLIVE/ChallengeDB_release/Images'
+        # },
+        # 'kadid': {
+        #     'json_path': '/home/sanjotst/llm_iqa/llm-iqa/labels/kadid.json',
+        #     'img_dir': '/scratch/sanjotst/datasets/kadid10k/images'
+        # },
+        # 'koniq': {
+        #     'json_path': '/home/sanjotst/llm_iqa/llm-iqa/labels/koniq.json',
+        #     'img_dir': '/scratch/sanjotst/datasets/KonIQ-10k/512x384'
+        # },
+        # 'pipal': {
+        #     'json_path': '/home/sanjotst/llm_iqa/llm-iqa/labels/pipal.json',
+        #     'img_dir': '/scratch/sanjotst/datasets/PIPAL'
+        # },
+        # 'spaq': {
+        #     'json_path': '/home/sanjotst/llm_iqa/llm-iqa/labels/spaq.json',
+        #     'img_dir': '/scratch/sanjotst/datasets/SPAQ_512/TestImage'
+        # }
     }
 
 

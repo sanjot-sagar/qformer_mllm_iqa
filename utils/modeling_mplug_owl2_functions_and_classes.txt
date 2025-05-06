@@ -1,0 +1,20 @@
+class MPLUGOwl2MetaModel:
+class MPLUGOwl2MetaForCausalLM(ABC):
+class MPLUGOwl2LlamaModel(MPLUGOwl2MetaModel, LlamaModel):
+class MPLUGOwl2LlamaForCausalLM(LlamaForCausalLM, MPLUGOwl2MetaForCausalLM):
+def __init__(self, config):
+def get_vision_tower(self):
+def get_visual_abstractor(self):
+def get_model(self):
+def encode_images(self, images):
+def prepare_inputs_labels_for_multimodal(self, input_ids, attention_mask, past_key_values, labels, images):
+def __init__(self, config):
+def __init__(self, config):
+def __init__(self, config):
+def encode_images(self, images):
+def get_model(self):
+def forward(self, input_ids, attention_mask, past_key_values, inputs_embeds, labels, use_cache, output_attentions, output_hidden_states, images, return_dict):
+def prepare_inputs_for_generation(self, input_ids, past_key_values, attention_mask, inputs_embeds):
+def __init__(self, config):
+def get_model(self):
+def forward(self, input_ids, past_key_values, attention_mask, token_type_ids, position_ids, head_mask, inputs_embeds, encoder_hidden_states, encoder_attention_mask, labels, use_cache, output_attentions, output_hidden_states, images, return_dict):
