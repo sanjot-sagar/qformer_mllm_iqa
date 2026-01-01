@@ -25,6 +25,7 @@ pip install -r requirements.txt
 To run inference we need to execute testing_loop.py, before that you must update the dataset details in the `get_dataset_info` function. The JSON files containing ground truth can be fetched from here https://github.com/Q-Future/Q-Bench/tree/master/a3_iqa_databases
 Here is an example configuration for the AGIQA-3k dataset:
 The file(testing_loop.py) contains information for all the datasets, you will need to introduce your dataset with or maybe comment out some datasets on which you dont want to perform inference. 
+The JSON files may need editing to fix the relative paths depending on from where you're executing the file. 
 ```python
 def get_dataset_info():
     return {
