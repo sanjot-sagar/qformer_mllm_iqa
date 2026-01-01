@@ -1,7 +1,7 @@
 
 # No-Reference Image Quality Assessment (NR-IQA) using Multimodal Models
 
-This repository performs inference for image quality assessment on AI-generated images using a pre-trained multimodal model.
+This repository performs inference for image quality assessment on AI-generated images and authentically distorted images using a pre-trained multimodal model.
 
 ## 🔧 Installation
 
