@@ -82,11 +82,14 @@ config_path = os.path.join(os.path.dirname(
 
 ## 🚀 Running Inference
 
-Once the environment is set up and files are in place, run the testing_loop.py script with the required parameters. To replicate results with inference, you need to run with the exact parameters as given in the code, the file will automatically default to these parameters, but the user still needs to change the GPU device ID and model_path. 
+Once the environment is set up and files are in place, run the `testing_loop.py` script with the required parameters.  
+To replicate results with inference, you need to run with the **exact parameters as defined in the code**. The script defaults to these parameters automatically, but the user must manually update:
+
+- **GPU device ID**
+- **`model_path`**
 
 ---
-bash
-python testing_loop.py
-```
 
-```
+```bash
+python testing_loop.py
+
