@@ -22,8 +22,7 @@ pip install -r requirements.txt
 
 ## 📁 Dataset Structure
 
-To run inference, you must update the dataset details in the `get_dataset_info` function.
-
+To run inference, you must update the dataset details in the `get_dataset_info` function. The JSON files containing ground truth can be fetched from here https://github.com/Q-Future/Q-Bench/tree/master/a3_iqa_databases
 Here is an example configuration for the AGIQA-3k dataset:
 
 ```python
