@@ -22,9 +22,9 @@ pip install -r requirements.txt
 
 ## 📁 Dataset Structure
 
-To run inference, you must update the dataset details in the `get_dataset_info` function. The JSON files containing ground truth can be fetched from here https://github.com/Q-Future/Q-Bench/tree/master/a3_iqa_databases
+To run inference we need to execute testing_loop.py, before that you must update the dataset details in the `get_dataset_info` function. The JSON files containing ground truth can be fetched from here https://github.com/Q-Future/Q-Bench/tree/master/a3_iqa_databases
 Here is an example configuration for the AGIQA-3k dataset:
-
+The file(testing_loop.py) contains information for all the datasets, you will need to introduce your dataset with or maybe comment out some datasets on which you dont want to perform inference. 
 ```python
 def get_dataset_info():
     return {
@@ -82,10 +82,11 @@ config_path = os.path.join(os.path.dirname(
 
 ## 🚀 Running Inference
 
-Once the environment is set up and files are in place, run the testing.py script with the required parameters. To replicate results with inference, you need to run with the exact parameters as given, while changing the GPU device ID and model_path. 
+Once the environment is set up and files are in place, run the testing_loop.py script with the required parameters. To replicate results with inference, you need to run with the exact parameters as given in the code, the file will automatically default to these parameters, but the user still needs to change the GPU device ID and model_path. 
 
 ---
-
+bash
+python testing_loop.py
 ```
 
 ```
